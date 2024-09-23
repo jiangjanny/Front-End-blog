@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>拋物線套圈圈遊戲</title>
+        <style>
+            canvas {
+                border: 1px solid black;
+                touch-action: none; /* 禁用觸摸滾動 */
+            }
+        </style>
+    </head>
+    <body>
+        <h1>拋物線套圈圈遊戲</h1>
+        <canvas id="gameCanvas" width="400" height="400"></canvas>
+        <button id="aimButton">瞄準</button>
+        <button id="throwButton">投擲</button>
+        <p id="message"></p>
+        <script>
+            const canvas = document.getElementById('gameCanvas')
+            const ctx = canvas.getContext('2d')
+            const aimButton = document.getElementById('aimButton')
+            const throwButton = document.getElementById('throwButton')
+            const message = document.getElementById('message')
+
+            const targets = [
+                { x: 50, y: 50 },
+                { x: 150, y: 100 },
+                { x: 250, y: 150 },
+                { x: 350, y: 100 },
+                { x: 450, y: 50 },
+                { x: 100, y: 250 },
+                { x: 300, y: 250 },
+                { x: 500, y: 250 },
+            ] // 固定位置的目標
+            const targetCount = targets.length
+            const targetRadius = 15
+            const projectile = {
+                x: canvas.width / 2,
+                y: canvas.height - 20,
+                radius: 5,
+                launched: false,
+                velocityX: 0,
+                velocityY: 0,
+                targetIndex: -1,
+            }
+
+            function drawTargets() {
+                ctx.fillStyle = 'red'
+                targets.forEach((target) => {
+                    ctx.beginPath()
+                    ctx.arc(target.x, target.y, targetRadius, 0, Math.PI * 2)
+                    ctx.fill()
+                })
+            }
+
+            function drawProjectile() {
+                ctx.fillStyle = 'blue'
+                ctx.beginPath()
+                ctx.arc(projectile.x, projectile.y, projectile.radius, 0, Math.PI * 2)
+                ctx.fill()
+            }
+
+            function drawAimLine(touchX, touchY) {
+                ctx.strokeStyle = 'green'
+                ctx.setLineDash([5, 5]) // 設置虛線樣式
+                ctx.beginPath()
+                ctx.moveTo(projectile.x, projectile.y)
+                ctx.lineTo(touchX, touchY)
+                ctx.stroke()
+                ctx.setLineDash([]) // 重置為實線
+            }
+
+            function clearAimLine() {
+                ctx.strokeStyle = 'white' // 使用白色清除線
+                ctx.beginPath()
+                ctx.moveTo(projectile.x, projectile.y)
+                ctx.lineTo(projectile.x, projectile.y)
+                ctx.stroke()
+            }
+
+            function checkHit() {
+                if (projectile.targetIndex >= 0) {
+                    const target = targets[projectile.targetIndex]
+                    const distance = Math.sqrt((projectile.x - target.x) ** 2 + (projectile.y - target.y) ** 2)
+                    if (distance <= projectile.radius + targetRadius) {
+                        message.textContent = '恭喜！你圈到了目標！'
+                        resetGame()
+                    }
+                }
+            }
+
+            function resetGame() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+                projectile.launched = false
+                projectile.x = canvas.width / 2
+                projectile.y = canvas.height - 20
+                projectile.targetIndex = -1
+                drawTargets()
+            }
+
+            function launchProjectile(targetIndex) {
+                if (targetIndex >= 0) {
+                    const target = targets[targetIndex]
+                    const angle = Math.atan2(target.y - projectile.y, target.x - projectile.x)
+                    const speed = 10 // 投擲速度
+                    projectile.velocityX = speed * Math.cos(angle)
+                    projectile.velocityY = speed * Math.sin(angle)
+                    projectile.launched = true
+                }
+            }
+
+            function updateProjectile() {
+                if (projectile.launched) {
+                    projectile.x += projectile.velocityX
+                    projectile.y += projectile.velocityY
+                    projectile.velocityY += 0.2 // 模擬重力
+
+                    if (projectile.y > canvas.height) {
+                        resetGame() // 如果落地則重置遊戲
+                    }
+                }
+            }
+
+            function gameLoop() {
+                ctx.clearRect(0, 0, canvas.width, canvas.height)
+                updateProjectile()
+                drawTargets()
+                drawProjectile()
+                checkHit()
+                requestAnimationFrame(gameLoop)
+            }
+
+            // 瞄準和投擲事件
+            let aiming = false
+            aimButton.addEventListener('click', () => {
+                aiming = true
+                message.textContent = '請點擊或觸摸一個目標以瞄準'
+            })
+
+            throwButton.addEventListener('click', () => {
+                if (projectile.targetIndex >= 0) {
+                    launchProjectile(projectile.targetIndex)
+                    aiming = false
+                    clearAimLine() // 清除瞄準線
+                }
+            })
+
+            // 觸摸事件
+            canvas.addEventListener('touchstart', (event) => {
+                event.preventDefault() // 防止默認行為
+                const touch = event.touches[0]
+                const touchX = touch.clientX - canvas.offsetLeft
+                const touchY = touch.clientY - canvas.offsetTop
+
+                if (aiming) {
+                    targets.forEach((target, index) => {
+                        const distance = Math.sqrt((touchX - target.x) ** 2 + (touchY - target.y) ** 2)
+                        if (distance <= targetRadius) {
+                            projectile.targetIndex = index // 設定選中的目標
+                            drawAimLine(target.x, target.y) // 繪製瞄準線
+                        }
+                    })
+                }
+            })
+
+            // 點擊事件
+            canvas.addEventListener('click', (event) => {
+                const clickX = event.clientX - canvas.offsetLeft
+                const clickY = event.clientY - canvas.offsetTop
+
+                if (aiming) {
+                    targets.forEach((target, index) => {
+                        const distance = Math.sqrt((clickX - target.x) ** 2 + (clickY - target.y) ** 2)
+                        if (distance <= targetRadius) {
+                            projectile.targetIndex = index // 設定選中的目標
+                            drawAimLine(target.x, target.y) // 繪製瞄準線
+                        }
+                    })
+                }
+            })
+
+            // 初始化遊戲
+            drawTargets()
+            gameLoop()
+        </script>
+    </body>
+</html>
